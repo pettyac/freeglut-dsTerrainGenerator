@@ -16,7 +16,11 @@ void mygllib::Keyboard::keyboard(unsigned char key, int w, int h)
 		case 'Y': view.eyey() += 0.1; break;
 		case 'z': view.eyez() -= 0.1; break;
 		case 'Z': view.eyez() += 0.1; break;
-		
+        
+        case 'i': view.refy() += 0.1; break;
+        case 'k': view.refy() -= 0.1; break;
+        
+        		
 		case 'v': view.fovy() -= 0.1; break;
 		case 'V': view.fovy() += 0.1; break;
 		case 'a': view.aspect() -= 0.1; break;

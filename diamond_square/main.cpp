@@ -6,11 +6,11 @@
 #include <cmath>
 #include <ctime>
 GLboolean light_on;
-GLfloat light_ambient[4];
+GLfloat light_ambient[] = {0.0, 1.0, 0.0, 0.0};
 GLfloat light_diffuse[4];
 GLfloat light_specular[4];
 GLfloat light_position[4];
-
+GLfloat light_model_ambient[] = {0.2, 0.2, 0.2, 1.0};
 
 /************************************************
 
@@ -26,7 +26,7 @@ const int SIZE = N - 1;
 
 float heightmap[N][N];
 float M = 0.25 * N; //Max rand range
-float R = 1.5;      //roughness
+float R = 1;      //roughness
 
 
 void init()
@@ -37,13 +37,18 @@ void init()
 	view.lookat();
 	glViewport(0, 0, 400, 400);
 	glEnable(GL_DEPTH_TEST);	
-	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
-	glColor3f(0.9, 0.9, 0.9);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glLightModelfv(GL_LIGHT_MODEL_AMBIENT, light_model_ambient);
+	glShadeModel(GL_SMOOTH);
+    glEnable(GL_NORMALIZE);
+    glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+	glColor3f(0.9, 0.7, 0.9);
 
 
     heightmap[0][0] = 1;
-	heightmap[0][N - 1] = 2;
-	heightmap[N - 1][0] = 2;
+	heightmap[0][N - 1] = 1;
+	heightmap[N - 1][0] = 1;
 	heightmap[N - 1][N - 1] = 1;
 
 }
@@ -160,27 +165,122 @@ void diamond_square()
     }
 }
 
+GLfloat* crossProd(GLfloat p[3], GLfloat q[3])
+{
+    GLfloat* pq = new GLfloat[3];
+    pq[0] = p[1]*q[2] - p[2]*q[1];
+    pq[1] = p[2]*q[0] - p[0]*q[2];
+    pq[2] = p[0]*q[1] - p[1]*q[0];
+    return pq;    
+}
 
+
+GLfloat* normTopLeft(int x, float y, int z)
+{
+    GLfloat p[3] = {x, y, z};
+    GLfloat q[3] = {x, heightmap[x][z - 1], z - 1};     
+    GLfloat r[3] = { x - 1, heightmap[x - 1][z], z };
+    
+    GLfloat pq[3] = {q[0] - p[0], q[1] - p[1], q[2] - p[2]};
+    GLfloat pr[3] = {r[0] - p[0], r[1] - p[1], r[2] - p[2]};
+    GLfloat* n = crossProd(pq, pr);
+
+    float d = sqrt(n[0]*(n[0]) + n[1]*n[1] + n[2]*n[2]);
+
+    n[0] /= d;
+    n[1] /= d;
+    n[2] /= d;
+     
+    return n;
+}
+
+GLfloat* normMidLeft(int x, float y, int z)
+{
+    GLfloat p[3] = {x - 1, heightmap[x - 1][z], z};
+    GLfloat q[3] = {x - 1, heightmap[x - 1][z + 1], z + 1};     
+    GLfloat r[3] = { x, y, z };
+    
+    GLfloat pq[3] = {q[0] - p[0], q[1] - p[1], q[2] - p[2]};
+    GLfloat pr[3] = {r[0] - p[0], r[1] - p[1], r[2] - p[2]};
+    GLfloat* n = crossProd(pq, pr);
+
+    float d = sqrt(n[0]*(n[0]) + n[1]*n[1] + n[2]*n[2]);
+
+    n[0] /= d;
+    n[1] /= d;
+    n[2] /= d;
+     
+    return n;
+}
+
+GLfloat* normMidRight(int x, float y, int z)
+{
+    GLfloat p[3] = {x + 1, heightmap[x + 1][z], z};
+    GLfloat q[3] = {x + 1, heightmap[x + 1][z - 1], z - 1};     
+    GLfloat r[3] = { x, y, z };
+    
+    GLfloat pq[3] = {q[0] - p[0], q[1] - p[1], q[2] - p[2]};
+    GLfloat pr[3] = {r[0] - p[0], r[1] - p[1], r[2] - p[2]};
+    GLfloat* n = crossProd(pq, pr);
+
+    float d = sqrt(n[0]*(n[0]) + n[1]*n[1] + n[2]*n[2]);
+
+    n[0] /= d;
+    n[1] /= d;
+    n[2] /= d;
+     
+    return n;
+}
+
+
+
+void normAdjacentTriangles(GLfloat x, GLfloat y, GLfloat z)
+{
+    GLfloat* n1 = normTopLeft(x, y, z);
+    GLfloat* n2 = normMidLeft(x, y, z);
+    GLfloat* n3 = normMidRight(x, y, z); 
+    
+    
+    GLfloat nv[3];
+    nv[0] = n1[0] + n2[0] + n3[0] / 3;
+    nv[1] = n1[1] + n2[1] + n3[1] / 3;
+    nv[2] = n1[2] + n2[2] + n3[2] / 3;
+    glNormal3fv(nv);
+}
 
 
 
 void draw_map()
 {
-    glColor3f(0.0, 0.0, 0.0);
+    //glColor3f(0.0, 0.0, 0.0);
     for (int x = 0; x < SIZE; ++x)
     {
-        //glBegin(GL_TRIANGLE_STRIP);
         glBegin(GL_TRIANGLES);
         {
             for (int z = 0; z < SIZE; ++z)
-            {   
-                /*
-                glVertex3f(x, heightmap[x][z], z);
-                glVertex3f(x, heightmap[x][z + 1], z + 1);
-                glVertex3f(x + 1, heightmap[x + 1][z], z);
-                glVertex3f(x + 1, heightmap[x + 1][z + 1], z + 1);
-                */
-            }
+            {    
+                if ((z > 0 || x > 0) || (z < N || x < N))
+                {
+                    normAdjacentTriangles(x, heightmap[x][z], z);
+                    glVertex3f(x, heightmap[x][z], z);
+                    
+                    normAdjacentTriangles(x, heightmap[x][z + 1], z + 1);
+                    glVertex3f(x, heightmap[x][z + 1], z + 1);
+
+                    normAdjacentTriangles(x + 1, heightmap[x + 1][z], z);
+                    glVertex3f(x + 1, heightmap[x + 1][z], z);
+
+                    normAdjacentTriangles(x + 1, heightmap[x + 1][z + 1], z + 1);
+                    glVertex3f(x + 1, heightmap[x + 1][z + 1], z + 1);
+
+                    normAdjacentTriangles(x + 1, heightmap[x + 1][z], z);
+                    glVertex3f(x + 1, heightmap[x + 1][z], z);
+
+                    normAdjacentTriangles(x, heightmap[x][z + 1], z + 1);
+                    glVertex3f(x, heightmap[x][z + 1], z + 1);
+                }
+
+           }
         }
         glEnd();
     }
@@ -195,10 +295,11 @@ void display()
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
     glFrontFace(GL_CCW);
     //mygllib::draw_xz_plane();
-	mygllib::draw_axes(1);
+	//mygllib::draw_axes(1);
     draw_map();
 	glutSwapBuffers();
 }
+
 
 void map_vals()
 {
@@ -212,6 +313,8 @@ void map_vals()
         std::cout << '\n';
     }
 }
+
+
 int main(int argc, char ** argv)
 {
     srand(time(NULL));
